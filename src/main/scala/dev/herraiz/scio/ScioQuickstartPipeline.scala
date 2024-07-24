@@ -18,7 +18,6 @@
 package dev.herraiz.scio
 
 import com.spotify.scio._
-import com.spotify.scio.values.SCollection
 
 object ScioQuickstartPipeline {
 
@@ -33,8 +32,42 @@ object ScioQuickstartPipeline {
     runPipeline(inputFile, numWords, outputFile)
   }
 
+  val thingsToRemove = List('.', ',', '?', '!', '¡', '¿', ';')
+
+  val accents = Map(
+    'á' -> 'a',
+    'é' -> 'e',
+    'í' -> 'i',
+    'ó' -> 'o',
+    'ú' -> 'u'
+  )
+
+  def sanitizeWord(w: String): String = {
+    w.toLowerCase.filter(
+      c => !thingsToRemove.contains(c
+      )).map(
+      c => accents.getOrElse(c, c)
+    )
+  }
+
   def runPipeline(inputFile: String, numWords: Int, outputFile: String)(implicit sc: ScioContext): Unit = {
-    ???
+    val lines = sc.textFile(inputFile)
+    val words = lines.flatMap(
+      _.split(" ")
+    )
+    val clean = words.map(sanitizeWord)
+
+    val counted = clean.countByValue
+
+    val topWords = counted.swap.top(numWords)
+
+    val csvlines = topWords.map{
+      t => t.map {
+        case (n: Long, w: String) => List(n.toString, w).mkString(",")
+      }.mkString("\n")
+    }
+
+    csvlines.saveAsTextFile(path=outputFile)
 
     sc.run()
   }
